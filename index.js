@@ -1,6 +1,7 @@
 const express = require("express");
 const sql = require("mysql2");
 const bcrypt = require("bcrypt");
+const jwtUtils = require("jsonwebtoken");
 const cors = require("cors");
 
 const app = express();
@@ -43,10 +44,10 @@ app.post("/signin", (req, res) => {
 app.post("/login", (req, res) => {
   connexion.query(
     `
-    SELECT u.id, u.email, u.password, r.name
+    SELECT u.id, u.mail, u.password, r.role_name
     FROM user u 
-    JOIN role r ON u.role_id = r.id 
-    WHERE email = ?
+    JOIN role r ON u.role = r.role_id 
+    WHERE mail = ?
     `,
     [req.body.email],
     (err, lines) => {
