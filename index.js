@@ -112,7 +112,7 @@ app.put("/room/:id", interceptor, (req, res) => {
   connexion.query("SELECT * FROM room WHERE room_name = ? AND room_id != ?", [room.name, room.id], (err, lines) => {
     if (lines.length > 0) return res.sendStatus(409);
 
-    connexion.query("UPDATE room SET room_name = ?, description = ? WHERE room_id = ?", [room.name, room.description, room.id], (err, line) => {
+    connexion.query("UPDATE room SET room_name = ?, room_desc = ? WHERE room_id = ?", [room.name, room.description, room.id], (err, line) => {
       if (err) {
         console.log(err);
         return res.sendStatus(500);
@@ -129,46 +129,35 @@ app.post("/room", interceptor, (req, res) => {
 
   if (room.name == null || room.nom == "" || room.name.length > 20 || room.description.length > 50) return res.sendStatus(400);
 
-  // Verification si le nom du produit existe déjà
   connexion.query("SELECT * FROM room WHERE room_name = ?", [room.name], (err, line) => {
     if (line.length > 0) {
-      return res.sendStatus(409); // Conflict
+      return res.sendStatus(409);
     }
 
-    connexion.query("INSERT INTO room (room_name, description, id_creator) VALUES (?, ?, ?)", [room.name, room.description, req.user.id], (err, line) => {
+    connexion.query("INSERT INTO room (room_name, room_desc, room_creator) VALUES (?, ?, ?)", [room.name, room.description, req.user.id], (err, line) => {
       if (err) {
         console.log(err);
-        return res.sendStatus(500); // Internal Server error
+        return res.sendStatus(500);
       }
-      res.status(201).json(room); // Created
+      res.status(201).json(room);
     });
   });
 });
 
 app.delete("/room/:id", interceptor, (req, res) => {
-  // On récupère le produit
-  connexion.query("SELECT * FROM product WHERE id = ?", [req.params.id], (err, lines) => {
-    // Si il y a une erreur
+  connexion.query("SELECT * FROM room WHERE room_id = ?", [req.params.id], (err, lines) => {
     if (err) {
       console.error(err);
       return res.sendStatus(500);
     }
 
-    // Si le produit est inconnu
-    if (lines.length == 0) {
-      return res.sendStatus(404);
-    }
+    if (lines.length == 0) return res.sendStatus(404);
 
-    // SI l'utilisateur est connecté et utilisateur
-    const isOwner = req.user.role == "vendeur" && req.user.id == lines[0].id_creator;
+    const isOwner = req.user.role == "modo" && req.user.id == lines[0].id_creator;
 
-    // Si il n'est ni propriétaire du produit et administrateur
-    if (!isOwner && req.user.role != "administrateur") {
-      return res.sendStatus(403);
-    }
+    if (!isOwner && req.user.role != "admin") return res.sendStatus(403);
 
-    // On supprime le produit
-    connexion.query("DELETE FROM product WHERE id = ?", [req.params.id], (err, lines) => {
+    connexion.query("DELETE FROM room WHERE room_id = ?", [req.params.id], (err, lines) => {
       if (err) {
         console.error(err);
         return res.sendStatus(500);
