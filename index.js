@@ -130,9 +130,7 @@ app.post("/room", interceptor, (req, res) => {
   if (room.name == null || room.nom == "" || room.name.length > 20 || room.description.length > 50) return res.sendStatus(400);
 
   connexion.query("SELECT * FROM room WHERE room_name = ?", [room.name], (err, line) => {
-    if (line.length > 0) {
-      return res.sendStatus(409);
-    }
+    if (line.length > 0) return res.sendStatus(409);
 
     connexion.query("INSERT INTO room (room_name, room_desc, room_creator) VALUES (?, ?, ?)", [room.name, room.description, req.user.id], (err, line) => {
       if (err) {
@@ -164,6 +162,24 @@ app.delete("/room/:id", interceptor, (req, res) => {
       }
 
       return res.sendStatus(204);
+    });
+  });
+});
+
+app.post("/join", interceptor, (req, res) => {
+  const room = req.body;
+
+  if (room.room_id != 0) return res.sendStatus(400);
+
+  connexion.query("SELECT * FROM user_room WHERE user_id = ? AND room_id = ?", [room.room_id, req.user.id], (err, line) => {
+    if (line.length > 0) return res.sendStatus(409);
+
+    connexion.query("INSERT INTO user_room (user_id, room_id) VALUES (?, ?)", [room.room_id, req.user.id], (err, line) => {
+      if (err) {
+        console.log(err);
+        return res.sendStatus(500);
+      }
+      res.status(201).json(room);
     });
   });
 });
