@@ -1,5 +1,6 @@
 const express = require("express");
 const sql = require("mysql2");
+const bcrypt = require("bcrypt");
 const cors = require("cors");
 
 const app = express();
@@ -10,8 +11,8 @@ app.use(express.json());
 const connexion = sql.createConnection({
   host: "localhost",
   user: "root",
-  password: "",
   database: "eval-angular",
+  password: "",
 });
 
 connexion.connect((err) => {
@@ -25,7 +26,7 @@ connexion.connect((err) => {
 app.post("/signin", (req, res) => {
   const user = req.body;
   const passwordHash = bcrypt.hashSync(user.password, 10);
-  connexion.query("INSERT INTO user (email, password, role_id) VALUES (?, ?, 1)", [user.email, passwordHash], (err, line) => {
+  connexion.query("INSERT INTO user (mail, password, role) VALUES (?, ?, 3)", [user.email, passwordHash], (err, line) => {
     if (err && err.code == "ER_DUP_ENTRY") {
       return res.sendStatus(409); // Conflit
     }
