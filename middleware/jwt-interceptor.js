@@ -4,9 +4,9 @@ function intercept(req, res, next) {
   const token = req.headers.authorization;
 
   try {
-    if (!token || !jwtUtils.verify(token, "azerty123")) {
+    if (!token || !jwtUtils.verify(token, "maSignature999")) {
       console.log("token: " + token);
-      console.log("value: " + jwtUtils.verify(token, "azerty123"));
+      console.log("value: " + jwtUtils.verify(token, "maSignature999"));
 
       return res.sendStatus(401);
     }

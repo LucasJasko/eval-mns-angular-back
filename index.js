@@ -3,6 +3,7 @@ const sql = require("mysql2");
 const bcrypt = require("bcrypt");
 const jwtUtils = require("jsonwebtoken");
 const cors = require("cors");
+const interceptor = require("./middleware/jwt-interceptor");
 
 const app = express();
 
@@ -68,7 +69,7 @@ app.post("/login", (req, res) => {
         jwtUtils.sign(
           {
             sub: req.body.email,
-            role: lines[0].name,
+            role: lines[0].role_name,
             id: lines[0].id,
           },
           "maSignature999"
@@ -76,6 +77,106 @@ app.post("/login", (req, res) => {
       );
     }
   );
+});
+
+app.get("/room/list", (req, response) => {
+  connexion.query("SELECT * FROM room", (err, item) => {
+    if (err) {
+      console.error(err);
+      return res.send(500);
+    }
+    return response.json(item);
+  });
+});
+
+app.get("/room/:id", interceptor, (req, res) => {
+  connexion.query("SELECT * FROM room WHERE room_id = ?", [req.params.id], (err, lines) => {
+    if (err) {
+      console.error(err);
+      return res.sendStatus(500);
+    }
+
+    if (lines.length == 0) return res.sendStatus(404);
+
+    return res.json(lines[0]);
+  });
+});
+
+app.put("/room/:id", interceptor, (req, res) => {
+  const room = req.body;
+  room.id = req.params.id;
+
+  if (req.user.role != "modo" && req.user.role != "admin") return res.sendStatus(403);
+  if (room.name == null || room.name == "" || room.name.length > 20 || room.description.length > 50) return res.sendStatus(400);
+
+  connexion.query("SELECT * FROM room WHERE room_name = ? AND room_id != ?", [room.name, room.id], (err, lines) => {
+    if (lines.length > 0) return res.sendStatus(409);
+
+    connexion.query("UPDATE room SET room_name = ?, description = ? WHERE room_id = ?", [room.name, room.description, room.id], (err, line) => {
+      if (err) {
+        console.log(err);
+        return res.sendStatus(500);
+      }
+      return res.status(200).json(room);
+    });
+  });
+});
+
+app.post("/room", interceptor, (req, res) => {
+  const room = req.body;
+
+  if (req.user.role != "modo" && req.user.role != "admin") return res.sendStatus(403);
+
+  if (room.name == null || room.nom == "" || room.name.length > 20 || room.description.length > 50) return res.sendStatus(400);
+
+  // Verification si le nom du produit existe déjà
+  connexion.query("SELECT * FROM room WHERE room_name = ?", [room.name], (err, line) => {
+    if (line.length > 0) {
+      return res.sendStatus(409); // Conflict
+    }
+
+    connexion.query("INSERT INTO room (room_name, description, id_creator) VALUES (?, ?, ?)", [room.name, room.description, req.user.id], (err, line) => {
+      if (err) {
+        console.log(err);
+        return res.sendStatus(500); // Internal Server error
+      }
+      res.status(201).json(room); // Created
+    });
+  });
+});
+
+app.delete("/room/:id", interceptor, (req, res) => {
+  // On récupère le produit
+  connexion.query("SELECT * FROM product WHERE id = ?", [req.params.id], (err, lines) => {
+    // Si il y a une erreur
+    if (err) {
+      console.error(err);
+      return res.sendStatus(500);
+    }
+
+    // Si le produit est inconnu
+    if (lines.length == 0) {
+      return res.sendStatus(404);
+    }
+
+    // SI l'utilisateur est connecté et utilisateur
+    const isOwner = req.user.role == "vendeur" && req.user.id == lines[0].id_creator;
+
+    // Si il n'est ni propriétaire du produit et administrateur
+    if (!isOwner && req.user.role != "administrateur") {
+      return res.sendStatus(403);
+    }
+
+    // On supprime le produit
+    connexion.query("DELETE FROM product WHERE id = ?", [req.params.id], (err, lines) => {
+      if (err) {
+        console.error(err);
+        return res.sendStatus(500);
+      }
+
+      return res.sendStatus(204);
+    });
+  });
 });
 
 app.listen(8080, () => {
