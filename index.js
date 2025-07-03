@@ -169,17 +169,60 @@ app.delete("/room/:id", interceptor, (req, res) => {
 app.post("/join", interceptor, (req, res) => {
   const room = req.body;
 
-  if (room.room_id != 0) return res.sendStatus(400);
+  if (room.room_id <= 0) return res.sendStatus(400);
 
   connexion.query("SELECT * FROM user_room WHERE user_id = ? AND room_id = ?", [room.room_id, req.user.id], (err, line) => {
     if (line.length > 0) return res.sendStatus(409);
 
-    connexion.query("INSERT INTO user_room (user_id, room_id) VALUES (?, ?)", [room.room_id, req.user.id], (err, line) => {
+    connexion.query("INSERT INTO user_room (user_id, room_id) VALUES (?, ?)", [req.user.id, room.room_id], (err, line) => {
       if (err) {
         console.log(err);
         return res.sendStatus(500);
       }
       res.status(201).json(room);
+    });
+  });
+});
+
+app.post("/leave", interceptor, (req, res) => {
+  const room = req.body;
+
+  if (room.room_id <= 0) return res.sendStatus(400);
+
+  connexion.query("DELETE FROM user_room WHERE user_id = ? AND room_id = ?", [req.user.id, room.room_id], (err, line) => {
+    if (err) {
+      console.log(err);
+      return res.sendStatus(500);
+    }
+    res.status(201).json(room);
+  });
+});
+
+app.get("/user/list/:id", interceptor, (req, res) => {
+  connexion.query("SELECT room_id FROM user_room WHERE user_id = ?", [req.params.id], (err, line) => {
+    if (err) {
+      console.log(err);
+      return res.sendStatus(500);
+    }
+
+    if (line.length === 0) return res.status(201).json([]);
+
+    let list = [];
+    let sql = "SELECT * FROM room WHERE ";
+    for (let i = 0; i < line.length; i++) {
+      sql += "room_id = ?";
+      list[i] = line[i].room_id;
+      if (i < line.length - 1) {
+        sql += " OR ";
+      }
+    }
+
+    connexion.query(sql, list, (error, response) => {
+      if (error) {
+        console.log(error);
+        return res.sendStatus(500);
+      }
+      res.status(201).json(response);
     });
   });
 });
