@@ -198,7 +198,35 @@ app.post("/leave", interceptor, (req, res) => {
   });
 });
 
-app.get("/user/list/:id", interceptor, (req, res) => {
+app.get("/messages/:id", interceptor, (req, res) => {
+  connexion.query("SELECT * FROM message WHERE room_id = ?", [req.params.id], (err, messages) => {
+    if (err) {
+      console.log(err);
+      return res.sendStatus(500);
+    }
+    res.status(201).json(messages);
+  });
+});
+
+app.post("/message", interceptor, (req, res) => {
+  const request = req.body;
+
+  if (request.room_id <= 0) return res.sendStatus(400);
+
+  connexion.query(
+    "INSERT INTO message (message_content, room_id, message_author) VALUES (?, ?, ?)",
+    [request.message.content, request.room_id, "Lucas"],
+    (err, line) => {
+      if (err) {
+        console.log(err);
+        return res.sendStatus(500);
+      }
+      res.status(201).json(line);
+    }
+  );
+});
+
+app.get("/user-room/list/:id", interceptor, (req, res) => {
   connexion.query("SELECT room_id FROM user_room WHERE user_id = ?", [req.params.id], (err, line) => {
     if (err) {
       console.log(err);
