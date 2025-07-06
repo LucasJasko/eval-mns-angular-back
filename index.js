@@ -28,7 +28,7 @@ connexion.connect((err) => {
 app.post("/signin", (req, res) => {
   const user = req.body;
   const passwordHash = bcrypt.hashSync(user.password, 10);
-  connexion.query("INSERT INTO user (mail, password, role) VALUES (?, ?, 3)", [user.email, passwordHash], (err, line) => {
+  connexion.query("INSERT INTO user (mail, password, role, pseudo) VALUES (?, ?, 3, ?)", [user.email, passwordHash, user.pseudo], (err, line) => {
     if (err && err.code == "ER_DUP_ENTRY") {
       return res.sendStatus(409); // Conflit
     }
@@ -45,7 +45,7 @@ app.post("/signin", (req, res) => {
 app.post("/login", (req, res) => {
   connexion.query(
     `
-    SELECT u.id, u.mail, u.password, r.role_name
+    SELECT u.id, u.mail, u.password, u.pseudo, r.role_name
     FROM user u 
     JOIN role r ON u.role = r.role_id 
     WHERE mail = ?
@@ -70,6 +70,7 @@ app.post("/login", (req, res) => {
           {
             sub: req.body.email,
             role: lines[0].role_name,
+            pseudo: lines[0].pseudo,
             id: lines[0].id,
           },
           "maSignature999"
@@ -132,13 +133,19 @@ app.post("/room", interceptor, (req, res) => {
   connexion.query("SELECT * FROM room WHERE room_name = ?", [room.name], (err, line) => {
     if (line.length > 0) return res.sendStatus(409);
 
-    connexion.query("INSERT INTO room (room_name, room_desc, room_creator) VALUES (?, ?, ?)", [room.name, room.description, req.user.id], (err, line) => {
-      if (err) {
-        console.log(err);
-        return res.sendStatus(500);
+    const date = new Date().toISOString().slice(0, 19).replace("T", " ");
+
+    connexion.query(
+      "INSERT INTO room (room_name, room_desc, room_creator, room_creation_time) VALUES (?, ?, ?, '" + date + "')",
+      [room.name, room.description, req.user.id],
+      (err, line) => {
+        if (err) {
+          console.log(err);
+          return res.sendStatus(500);
+        }
+        res.status(201).json(room);
       }
-      res.status(201).json(room);
-    });
+    );
   });
 });
 
@@ -215,7 +222,7 @@ app.post("/message", interceptor, (req, res) => {
 
   connexion.query(
     "INSERT INTO message (message_content, room_id, message_author) VALUES (?, ?, ?)",
-    [request.message.content, request.room_id, "Lucas"],
+    [request.message.content, request.room_id, request.message_author],
     (err, line) => {
       if (err) {
         console.log(err);
@@ -224,6 +231,34 @@ app.post("/message", interceptor, (req, res) => {
       res.status(201).json(line);
     }
   );
+});
+
+app.put("/message", interceptor, (req, res) => {
+  const request = req.body;
+
+  if (request.room_id <= 0) return res.sendStatus(400);
+
+  connexion.query("UPDATE message SET message_content = ? WHERE message_id = ?", [request.message.content, request.message_id], (err, line) => {
+    if (err) {
+      console.log(err);
+      return res.sendStatus(500);
+    }
+    res.status(201).json(line);
+  });
+});
+
+app.delete("/message", interceptor, (req, res) => {
+  const request = req.body;
+
+  if (request.room_id <= 0) return res.sendStatus(400);
+
+  connexion.query("DELETE FROM message WHERE message_id = ?", [request.message_id], (err, line) => {
+    if (err) {
+      console.log(err);
+      return res.sendStatus(500);
+    }
+    res.status(201).json(line);
+  });
 });
 
 app.get("/user-room/list/:id", interceptor, (req, res) => {
